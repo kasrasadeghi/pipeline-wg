@@ -130,8 +130,8 @@ class DeviceManager:
         'local_client': self.local_device.name,
         'non_local_clients': [c.name for c in self.non_local_devices],
       },
-      self.server_device.name: {'private': self.server_device.private, 'public': self.server_device.public},
-      self.local_device.name: {'private': self.local_device.private, 'public': self.local_device.public},
+      self.server_device.name: self.server_device.to_dict(),
+      self.local_device.name: self.local_device.to_dict(),
     }
     for client in self.non_local_devices:
       data[client.name] = {'private': client.private, 'public': client.public}
