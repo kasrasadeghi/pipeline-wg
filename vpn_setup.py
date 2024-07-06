@@ -222,14 +222,14 @@ def main():
   if args.load:
     mgr = DeviceManager.load(args.config)
   else:
-    DeviceManager.validate_names(args.server_name, args.local, args.clients)
+    DeviceManager.validate_names(args.server, args.local, args.clients)
 
     mgr = DeviceManager(
       server_name='server',
       local_device=args.local,
       non_local_devices=args.clients,
     )
-    mgr.save('devices.json')
+    mgr.save(args.config)
   
   server_config = make_server_requirement(mgr.server(), mgr.clients())
   server_config.ensure()
