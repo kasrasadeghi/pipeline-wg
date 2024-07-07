@@ -127,8 +127,8 @@ class DeviceManager:
     data = {
       'args': {
         'server_name': self.server_device.name,
-        'local_client': self.local_device.name,
-        'non_local_clients': [c.name for c in self.non_local_devices],
+        'local_device': self.local_device.name,
+        'non_local_devices': [c.name for c in self.non_local_devices],
       },
       self.server_device.name: self.server_device.to_dict(),
       self.local_device.name: self.local_device.to_dict(),
