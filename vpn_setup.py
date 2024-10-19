@@ -17,40 +17,45 @@ import subprocess
 from typing import List
 import argparse
 import json
+import os
+
+# TODO make the defaults None and then provide a defaults SimpleNamespace to use if they're not available
 
 parser = argparse.ArgumentParser(description='Setup VPN on remote host.')
 parser.add_argument('--dry-run', action='store_true')
-parser.add_argument('--ssh-remote', required=True)
+parser.add_argument('--ssh-remote')
 parser.add_argument('--subnet', help='required if not loading')
-parser.add_argument('--server-ip', help='required if not loading')
+parser.add_argument('--public-ip', help='required if not loading')
 parser.add_argument('--server', help='the name of the remote server')
 parser.add_argument('--local', help='the name of the local client, if the current machine is the not the server')
 parser.add_argument('--clients', nargs='+', help="the non-local clients")
 parser.add_argument('--load', action='store_true', help='load from a json file')
-parser.add_argument('--config', help='the path to the json file to load from', default='output/devices.json')
+parser.add_argument('--input', help='the path to the folder that contains the json file to load from', default='output/devices.json')
+parser.add_argument('--output', help='the path to the folder that will contain the json file to save to', default='output/devices.json')
+parser.add_argument('--local-is-server', action='store_true')
 
 args = parser.parse_args()
 
-from requirement import Requirement
-Requirement.configure(args.ssh_remote, args.dry_run)
+if not args.local_is_server:
+  from requirement import Requirement
 
 # === requirements ==========================================
 
-packet_forwarding = Requirement(
-  desc='packet forwarding',
-  setup='sudo sysctl -p /etc/sysctl.d/70-wireguard-routing.conf -w',
-  check="(sudo sysctl -a | grep 'net.ipv4.ip_forward = 1') && (sudo sysctl -a | grep 'net.ipv4.conf.all.proxy_arp = 1')",
-  remote=True,
-  path='/etc/sysctl.d/70-wireguard-routing.conf',
-  content='net.ipv4.ip_forward = 1\nnet.ipv4.conf.all.proxy_arp = 1\n',
-)
+  packet_forwarding = Requirement(
+    desc='packet forwarding',
+    setup='sudo sysctl -p /etc/sysctl.d/70-wireguard-routing.conf -w',
+    check="(sudo sysctl -a | grep 'net.ipv4.ip_forward = 1') && (sudo sysctl -a | grep 'net.ipv4.conf.all.proxy_arp = 1')",
+    remote=True,
+    path='/etc/sysctl.d/70-wireguard-routing.conf',
+    content='net.ipv4.ip_forward = 1\nnet.ipv4.conf.all.proxy_arp = 1\n',
+  )
 
-package_install = Requirement(
-  desc='install prereqs',
-  setup='sudo apt-get update && sudo apt-get install wireguard-tools file -y',
-  check="dpkg -l | grep wireguard-tools",
-  remote=True,
-)
+  package_install = Requirement(
+    desc='install prereqs',
+    setup='sudo apt-get update && sudo apt-get install wireguard-tools file -y',
+    check="dpkg -l | grep wireguard-tools && dpkg -l | grep 'ii  file'",
+    remote=True,
+  )
 
 # === devices and device management ==========================================
 
@@ -86,27 +91,37 @@ class Device:
 
 
 class DeviceManager:
-  next_ip = 0
-  def __init__(self, server_name: str, local_device: str, non_local_devices: List[str]):
-    self.server_device = Device(server_name, f'{args.subnet}.1')
-    self.local_device = Device(local_device, f'{args.subnet}.2')
-    self.non_local_devices = [Device(name, f'{args.subnet}.{i+3}') for i, name in enumerate(non_local_devices)]
+  def __init__(self, subnet: str, ssh_remote: str, public_ip: str, server_name: str, local_device: str, non_local_devices: List[str]):
+    self.public_ip = public_ip
+    self.ssh_remote = ssh_remote
+    self.subnet = subnet
+    if server_name == local_device:
+      self.local_device = None
+      self.server_device = Device(local_device, f'{args.subnet}.2')
+      self.non_local_devices = [Device(name, f'{args.subnet}.{i+3}') for i, name in enumerate(non_local_devices)]
+    else:
+      self.server_device = Device(server_name, f'{args.subnet}.1')
+      self.local_device = Device(local_device, f'{args.subnet}.2')
+      self.non_local_devices = [Device(name, f'{args.subnet}.{i+3}') for i, name in enumerate(non_local_devices)]
   
   def server(self) -> Device:
     return self.server_device
   
   def clients(self) -> List[Device]:
-    return [self.local_device, *self.non_local_devices]
+    if self.local_device:
+      return [self.local_device, *self.non_local_devices]
+    else:
+      return self.non_local_devices
   
   @staticmethod
-  def validate_names(server_name: str, local_device: str, non_local_devices: List[str]):
+  def validate_names(subnet: str, ssh_remote: str, public_ip: str, server_name: str, local_device: str, non_local_devices: List[str]):
     assert server_name not in non_local_devices, f"Cannot name a client the same name as the server '{server_name}'"
     assert local_device not in non_local_devices, f"Cannot name a client the same as '{local_device}'"
     assert len(non_local_devices) == len(set(non_local_devices)), "Duplicate client names"
 
   @staticmethod
-  def load(filename):
-    with open(filename, 'r') as f:
+  def load(load_folder):
+    with open(os.path.join(load_folder, 'devices.json'), 'r') as f:
       data = json.load(f)
       
       def load_device(d, name):
@@ -123,19 +138,24 @@ class DeviceManager:
 
       return x
   
-  def save(self, filename):
+  def save(self, save_folder):
     data = {
       'args': {
+        'public_ip': self.public_ip,
+        'ssh_remote': self.ssh_remote,
+        'subnet': self.server_device.subnet(),
+
         'server_name': self.server_device.name,
-        'local_device': self.local_device.name,
+        'local_device': self.local_device.name if self.local_device else None,
         'non_local_devices': [c.name for c in self.non_local_devices],
       },
       self.server_device.name: self.server_device.to_dict(),
-      self.local_device.name: self.local_device.to_dict(),
     }
+    if self.local_device:
+      data[self.local_device.name] = self.local_device.to_dict()
     for client in self.non_local_devices:
-      data[client.name] = {'private': client.private, 'public': client.public}
-    with open(filename, 'w') as f:
+      data[client.name] = client.to_dict()
+    with open(os.path.join(save_folder, 'devices.json'), 'w') as f:
       json.dump(data, f, indent=2)
 
 # wireguard configs
@@ -173,7 +193,7 @@ AllowedIps = {client.ip}/32
   return content
 
 
-def make_client_requirement(client: Device, server: Device):
+def make_client_requirement(client: Device, server: Device, public_ip: str):
   content = make_client_config(client, server)
 
   interface_name = client['name']
@@ -189,7 +209,7 @@ def make_client_requirement(client: Device, server: Device):
     remote=False,
   )
 
-def make_client_config(client: Device, server: Device):
+def make_client_config(client: Device, server: Device, public_ip: str):
   return (
 f"""[Interface]
 # {client.name}
@@ -198,7 +218,7 @@ PrivateKey = {client.private}
 
 [Peer]
 # server
-Endpoint = {args.server_ip}:51820
+Endpoint = {public_ip}:51820
 PublicKey = {server.public}
 AllowedIPs = {server.subnet()}.0/24
 PersistentKeepalive = 25
@@ -206,43 +226,49 @@ PersistentKeepalive = 25
 
 
 def main():
-  if args.load:
-    print(args)
-    assert args.ssh_remote
-  else:
-    assert args.subnet
-    assert args.ssh_remote
-    assert args.server_ip
-
-  packet_forwarding.ensure()
-  package_install.ensure()
-
-  print('clients:', args.clients)
+  if not args.load:
+    assert args.output
 
   if args.load:
-    mgr = DeviceManager.load(args.config)
+    mgr = DeviceManager.load(args.input)
   else:
-    DeviceManager.validate_names(args.server, args.local, args.clients)
+    DeviceManager.validate_names(server_name=args.server, local_device=args.local, non_local_devices=args.clients, public_ip=args.public_ip,
+      ssh_remote=args.ssh_remote,
+      subnet=args.subnet)
 
     mgr = DeviceManager(
-      server_name='server',
+      server_name=args.server,
       local_device=args.local,
       non_local_devices=args.clients,
+      public_ip=args.public_ip,
+      ssh_remote=args.ssh_remote,
+      subnet=args.subnet
     )
-    mgr.save(args.config)
   
-  server_config = make_server_requirement(mgr.server(), mgr.clients())
-  server_config.ensure()
+  mgr.save(args.output)
 
-  with open('output/' + mgr.local_device.name + '.conf', "w+") as f:
-    f.write(make_client_config(mgr.local_device, mgr.server_device))
+  # we need a remote and a real run in order to install packages and config a system
+  if args.local_is_server:
+    assert args.dry_run and mgr.local_device is None, f"{args.dry_run=} {mgr.local_device.to_dict()=}"
+  else:
+    Requirement.configure(mgr.ssh_remote, args.dry_run)
+
+    packet_forwarding.ensure()
+    package_install.ensure()
+    
+    server_config = make_server_requirement(mgr.server(), mgr.clients())
+    server_config.ensure()
+
+  if mgr.local_device:
+    with open(os.path.join(args.output, mgr.local_device.name + '.conf'), "w+") as f:
+      f.write(make_client_config(mgr.local_device, mgr.server_device, mgr.public_ip))
   
-  with open('output/' + mgr.server_device.name + '.conf', "w+") as f:
+  with open(os.path.join(args.output, mgr.server_device.name + '.conf'), "w+") as f:
     f.write(make_server_config(mgr.server_device, mgr.clients()))
 
   for client in mgr.clients():
-    with open('output/' + client.name + '.conf', "w+") as f:
-      f.write(make_client_config(client, mgr.server_device))
+    with open(os.path.join(args.output, client.name + '.conf'), "w+") as f:
+      f.write(make_client_config(client, mgr.server_device, mgr.public_ip))
 
 if __name__ == '__main__':
   main()
