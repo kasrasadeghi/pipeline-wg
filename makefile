@@ -37,8 +37,8 @@ dry_load:
 
 load:
 	python vpn_setup.py --load \
-		--input archive/devices.json \
-		--output output/devices.json
+		--input archive/ \
+		--output output/
 
 hotspot:
 	python vpn_setup.py \
@@ -52,4 +52,4 @@ hotspot:
 		--output hotspot-output/
 
 qr:
-	qrencode -t ANSIUTF8 -r hotspot-output/mobile.conf
+	qrencode -t ANSIUTF8 -r output/iphone.conf
