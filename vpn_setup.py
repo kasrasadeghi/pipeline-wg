@@ -33,6 +33,7 @@ parser.add_argument('--load', action='store_true', help='load from a json file')
 parser.add_argument('--input', help='the path to the folder that contains the json file to load from', default='archive/')
 parser.add_argument('--output', help='the path to the folder that will contain the json file to save to', default='output/')
 parser.add_argument('--local-is-server', action='store_true')
+parser.add_argument('--local-install-only', action='store_true')
 
 args = parser.parse_args()
 
@@ -42,6 +43,7 @@ if not args.local_is_server:
 # === requirements ==========================================
 
   packet_forwarding = Requirement(
+    name='packet forwarding',
     desc='packet forwarding',
     setup='sudo sysctl -p /etc/sysctl.d/70-wireguard-routing.conf -w',
     check="(sudo sysctl -a | grep 'net.ipv4.ip_forward = 1') && (sudo sysctl -a | grep 'net.ipv4.conf.all.proxy_arp = 1')",
@@ -51,6 +53,7 @@ if not args.local_is_server:
   )
 
   package_install = Requirement(
+    name='prereqs',
     desc='install prereqs',
     setup='sudo apt-get update && sudo apt-get install wireguard-tools file -y',
     check="dpkg -l | grep wireguard-tools && dpkg -l | grep 'ii  file'",
@@ -122,6 +125,7 @@ class DeviceManager:
   @staticmethod
   def load(load_folder):
     with open(os.path.join(load_folder, 'devices.json'), 'r') as f:
+      print(f'loading from {load_folder}devices.json...')
       data = json.load(f)
       
       def load_device(d, name):
@@ -165,6 +169,7 @@ def make_server_requirement(server: Device, clients: List[Device]):
   interface_name = server.name
   path = f'/etc/wireguard/{interface_name}.conf'
   return Requirement(
+    name=interface_name,
     desc=f"'{interface_name}' wireguard config",
     setup=(f'sleep 1 && sudo systemctl enable wg-quick@{interface_name} '
             f'&& sudo systemctl restart wg-quick@{interface_name}'),
@@ -194,9 +199,9 @@ AllowedIps = {client.ip}/32
 
 
 def make_client_requirement(client: Device, server: Device, public_ip: str):
-  content = make_client_config(client, server)
+  content = make_client_config(client, server, public_ip)
 
-  interface_name = client['name']
+  interface_name = client.name
   path = f'/etc/wireguard/{interface_name}.conf'
   return Requirement(
     name=interface_name,
@@ -230,9 +235,15 @@ def main():
     assert args.output
 
   if args.load:
+    print(f'loading from {args.input}...')
     mgr = DeviceManager.load(args.input)
   else:
-    DeviceManager.validate_names(server_name=args.server, local_device=args.local, non_local_devices=args.clients, public_ip=args.public_ip,
+    assert args.clients is not None and len(args.clients) > 1, 'Cannot create config with no clients.  Did you mean to `--load`?'
+
+    DeviceManager.validate_names(server_name=args.server, 
+      local_device=args.local, 
+      non_local_devices=args.clients, 
+      public_ip=args.public_ip,
       ssh_remote=args.ssh_remote,
       subnet=args.subnet)
 
@@ -248,16 +259,21 @@ def main():
   mgr.save(args.output)
 
   # we need a remote and a real run in order to install packages and config a system
-  if args.local_is_server:
-    assert args.dry_run and mgr.local_device is None, f"{args.dry_run=} {mgr.local_device.to_dict()=}"
-  else:
-    Requirement.configure(mgr.ssh_remote, args.dry_run)
+  if not args.local_install_only:
+    if args.local_is_server:
+      assert args.dry_run and mgr.local_device is None, f"{args.dry_run=} {mgr.local_device.to_dict()=}"
+    else:
+      Requirement.configure(mgr.ssh_remote, args.dry_run)
 
-    packet_forwarding.ensure()
-    package_install.ensure()
-    
-    server_config = make_server_requirement(mgr.server(), mgr.clients())
-    server_config.ensure()
+      packet_forwarding.ensure()
+      package_install.ensure()
+      
+      print('installing server...')
+      server_config = make_server_requirement(mgr.server(), mgr.clients())
+      server_config.ensure()
+  else:
+    print('local install only...')
+    Requirement.configure(mgr.ssh_remote, args.dry_run)
 
   if mgr.local_device:
     with open(os.path.join(args.output, mgr.local_device.name + '.conf'), "w+") as f:
@@ -269,6 +285,20 @@ def main():
   for client in mgr.clients():
     with open(os.path.join(args.output, client.name + '.conf'), "w+") as f:
       f.write(make_client_config(client, mgr.server_device, mgr.public_ip))
+
+  if args.local_install_only:
+    local = mgr.local_device
+    if args.local is not None:
+      local = args.local
+    print(f'installing locally on {local}...')
+
+    local_device = None
+    for client in mgr.clients():
+      if client.name == local:
+        local_device = client
+        break
+    local_requirement = make_client_requirement(local_device, mgr.server_device, mgr.public_ip)
+    local_requirement.ensure()
 
 if __name__ == '__main__':
   main()

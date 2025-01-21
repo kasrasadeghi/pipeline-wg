@@ -7,7 +7,7 @@ def local(cmd, dry_run):
     print(f'$ {cmd}  # dry run')
     return SimpleNamespace(returncode=1, output=None)
   else:
-    p = subprocess.Popen(cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
+    p = subprocess.Popen(cmd, shell=True, executable='/bin/bash', stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
     print(f"$ {cmd}")
     for line in iter(p.stdout.readline, b''):
       print(line.decode('utf-8'), end='')
@@ -32,7 +32,8 @@ class Requirement:
   ssh_remote = None
   dry_run = None
 
-  def __init__(self, desc: str, setup: str, check: str, remote: bool, path: Optional[str] = None, content: Optional[str] = None):
+  def __init__(self, name: str, desc: str, setup: str, check: str, remote: bool, path: Optional[str] = None, content: Optional[str] = None):
+    self.name = name
     self.desc = desc
     self.setup = setup
     self.check = check
@@ -48,8 +49,8 @@ class Requirement:
   def ensure(self):
     assert Requirement.ssh_remote is not None, 'ssh_remote must be set'
     assert Requirement.dry_run is not None, 'dry_run must be set'
-    run = (lambda cmd: remote(cmd, Requirement.ssh_remote, Requirement.dry_run) if self.remote else
-           lambda cmd: local(cmd, Requirement.dry_run))
+    run = ((lambda cmd: remote(cmd, Requirement.ssh_remote, Requirement.dry_run)) if self.remote else
+           (lambda cmd: local(cmd, Requirement.dry_run)))
 
     def check():
       r = run(self.check)

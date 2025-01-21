@@ -53,3 +53,10 @@ hotspot:
 
 qr:
 	qrencode -t ANSIUTF8 -r output/iphone.conf
+
+install:
+	python vpn_setup.py \
+	    --load \
+		--input output/ \
+		--local kaz3080 \
+		--local-install-only
