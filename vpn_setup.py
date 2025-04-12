@@ -36,6 +36,7 @@ parser.add_argument('--local-is-server', action='store_true')
 parser.add_argument('--local-install-only', action='store_true')
 
 args = parser.parse_args()
+print(args)
 
 if not args.local_is_server:
   from requirement import Requirement
@@ -159,6 +160,9 @@ class DeviceManager:
       data[self.local_device.name] = self.local_device.to_dict()
     for client in self.non_local_devices:
       data[client.name] = client.to_dict()
+
+    if not os.path.exists(save_folder):
+      os.makedirs(save_folder)
     with open(os.path.join(save_folder, 'devices.json'), 'w') as f:
       json.dump(data, f, indent=2)
 
@@ -238,7 +242,7 @@ def main():
     print(f'loading from {args.input}...')
     mgr = DeviceManager.load(args.input)
   else:
-    assert args.clients is not None and len(args.clients) > 1, 'Cannot create config with no clients.  Did you mean to `--load`?'
+    assert args.clients is not None and len(args.clients) >= 1, 'Cannot create config with no clients.  Did you mean to `--load`?'
 
     DeviceManager.validate_names(server_name=args.server, 
       local_device=args.local, 
