@@ -1,0 +1,67 @@
+CORE USER FLOW
+
+we need to be able to discover the status of the current network
+
+then we need to be able to convert the network into the new network:
+- by deploying new configs to devices already on the network
+- by deploying new single-shot configs to devices that are on the LAN of the "controller" or "admin" machine and then updating the "beacon"
+
+then we need to validate that it actually works
+
+---
+
+SIDE USER FLOWS
+
+we need to be able to send qr codes to phones
+
+we need to be able to easy add a device to an existing network
+
+we need to be able to cycle keys for the network
+- we might need to be able to non-destructively cycle keys
+- we definitely need to be able to destructively cycle keys
+  - where we just blow away the old network and use google drive / flash drive / qr codes / ssh to deliver keys to the new network
+
+---
+
+NETWORK TOPOLOGIES
+
+A network session is a collection of devices that are connected to the same network. 
+
+A network may have the following devices:
+- beacon: has a public ip, used as the hub in a hub-and-spoke network
+- admin: the current machine, used to administer the network
+- clients: other devices that are on the same network
+- server: runs the pipeline server, may be a client, the admin machine, or the beacon.
+
+there are a few different topologies:
+- server-on-admin: run pipeline server on the admin machine at home. 
+    usually admin is a desktop or a rpi that runs 24/7.  you should run backups of the admin machine.
+- server-on-beacon: 
+    run pipeline server on the beacon machine.
+- server-on-client:
+    to administrate the network from a machine that is separate from the one that runs pipeline.  a bit weird, but e.g. if you're doing admin on your mac laptop and then have an rpi running the pipeline server 24/7.
+
+you might also administrate the network by sshing into the beacon machine.
+you might also also admin from the beacon machine (if it's local and it has a public ip, or if you have dynamic dns set up).
+
+we either have to detect the network topology, or have the user specify the topology.
+
+what about airplane mode?
+- where we run the server on my laptop and connect to it with my phone
+- is that even possible?
+- or the reverse, where we run the server on an android phone using termux and connect to it with my laptop.  hmm
+
+---
+
+we may even not have a beacon.
+- if we are using dynamic DNS, we don't need a beacon
+- also, if we are just running it locally for dev purposes, we don't need a beacon.
+
+
+---
+
+FLOWS PER TOPOLOGY
+
+TODO i guess
+for now i added some scripts that do things and a way to save/load and continue a network configuration session.
+you can add devices, add a phone, and do some stuff.
