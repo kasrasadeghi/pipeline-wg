@@ -12,8 +12,14 @@ ssh:
 phone:
 	python scripts/add_phone.py
 
+device:
+	python scripts/add_device.py --name kaz3080
+
 send:
 	python scripts/config_send.py --file output/kaz3080.conf --port 9000 --code-length 6
+
+load-and-upload:
+	python scripts/load_and_upload.py
 
 from-scratch:
 	python vpn_setup.py \

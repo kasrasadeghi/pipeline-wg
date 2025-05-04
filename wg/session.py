@@ -43,7 +43,7 @@ class Session:
       return Session.from_dict(data)
   
   def output(self):
-    network = self.networks.values()[0]
+    network = list(self.networks.values())[0]
     for device in network.devices:
       if device.ssh_remote is None:
         with open(f"output/{device.name}.conf", "w") as f:
