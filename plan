@@ -1,3 +1,18 @@
+STATUS
+
+the great part about the scripts based design rather than the whole-thing-in-one-go design is that it's easy to make a new script that's slightly different from another one.
+and we can have individual steps that allow us to change things up
+but we also don't need to like make an entire website and visualization for it.
+
+---
+
+NEXT 
+- actually visualizing the status 
+- cycling the keys
+- swapping IPs?
+
+---
+
 CORE USER FLOW
 
 we need to be able to discover the status of the current network
