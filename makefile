@@ -6,6 +6,9 @@ SUBNET = 10.50.50
 SERVER_IP = 5.78.42.196
 SSH_REMOTE = h
 
+list:
+	python scripts/list_session.py
+
 ssh:
 	python scripts/ssh.py
 
@@ -20,6 +23,9 @@ send:
 
 load-and-upload:
 	python scripts/load_and_upload.py
+
+inspect-beacon:
+	ssh h "cat /etc/wireguard/beacon.conf"
 
 from-scratch:
 	python vpn_setup.py \

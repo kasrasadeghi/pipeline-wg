@@ -60,11 +60,31 @@ class Network:
     self.public_ip = public_ip
     self.devices: List[Device] = []
     self.beacon: Device = None
+
+  def next_device_number(self):
+    device_numbers = [int(device.ip.rsplit(".", 1)[1]) for device in self.devices]
+    device_numbers.sort()
+    prior = None
+    for num in device_numbers:
+      if prior is None:
+        prior = num
+        continue
+      if num != prior + 1:
+        return prior + 1
+      prior = num
+    return prior + 1
   
   def create_device(self, name):
     assert name not in [dev.name for dev in self.devices], f"device with name '{name}' already created"
-    device = Device(name, self.prefix + "." + str(len(self.devices) + 1))
+    device = Device(name, self.prefix + "." + str(self.next_device_number()))
     self.devices.append(device)
+    self.parent_session.save()
+    return device
+  
+  def remove_device(self, name):
+    assert name in [dev.name for dev in self.devices], f"device with name '{name}' not found"
+    i, device = next((i, device) for i, device in enumerate(self.devices) if device.name == name)
+    self.devices.pop(i)
     self.parent_session.save()
     return device
   
