@@ -7,25 +7,25 @@ SERVER_IP = 5.78.42.196
 SSH_REMOTE = h
 
 list:
-	python scripts/list_session.py
+	python -m scripts.list_session
 
 ssh:
-	python scripts/ssh.py
+	python -m scripts.ssh --public_ip $(SERVER_IP) --ssh_remote $(SSH_REMOTE) --prefix $(SUBNET)
 
 phone:
-	python scripts/add_phone.py
+	python -m scripts.add_phone --prefix $(SUBNET)
 
 device:
-	python scripts/add_device.py --name kaz3080
+	python -m scripts.add_device --name kaz3080 --prefix $(SUBNET)
 
 send:
-	python scripts/config_send.py --file output/kaz3080.conf --port 9000 --code-length 6
+	python -m scripts.config_send --file output/kaz3080.conf --port 9000 --code-length 6
 
 load-and-upload:
-	python scripts/load_and_upload.py
+	python -m scripts.load_and_upload --prefix $(SUBNET)
 
 inspect-beacon:
-	ssh h "cat /etc/wireguard/beacon.conf"
+	ssh $(SSH_REMOTE) "cat /etc/wireguard/beacon.conf"
 
 from-scratch:
 	python vpn_setup.py \
