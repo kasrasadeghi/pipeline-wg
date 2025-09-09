@@ -12,7 +12,18 @@ if not session:
   exit(1)
 
 network = session.networks[args.prefix]
-device = network.create_device(name="phone")
+
+i = None
+for i, device in enumerate(network.devices):
+  if device.name == "phone":
+    device = network.devices[i]
+    break
+
+if i is None:
+  device = network.create_device(name="phone")
+else:
+  print("WARNING: phone device not found, creating new device")
+  device = network.devices[i]
 
 session.output()
 network.upload_beacon_config()
