@@ -72,7 +72,8 @@ class Network:
       if num != prior + 1:
         return prior + 1
       prior = num
-    return prior + 1
+    # If no devices exist, start with 1, otherwise return the next number after the last device
+    return 1 if prior is None else prior + 1
   
   def create_device(self, name):
     assert name not in [dev.name for dev in self.devices], f"device with name '{name}' already created"
