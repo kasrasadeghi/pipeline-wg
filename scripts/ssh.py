@@ -10,6 +10,7 @@ argparser = argparse.ArgumentParser()
 argparser.add_argument("--public_ip", required=True)
 argparser.add_argument("--ssh_remote", required=True)
 argparser.add_argument("--prefix", required=True)
+argparser.add_argument("--session", type=str, default="ssh")
 args = argparser.parse_args()
 
 session = Session.load("ssh")

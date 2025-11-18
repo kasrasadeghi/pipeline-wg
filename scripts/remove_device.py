@@ -5,6 +5,7 @@ import argparse
 argparser = argparse.ArgumentParser()
 argparser.add_argument("--name", type=str, default="client")
 argparser.add_argument("--prefix", type=str)
+argparser.add_argument("--session", type=str, default="ssh")
 args = argparser.parse_args()
 
 session = Session.load("ssh")

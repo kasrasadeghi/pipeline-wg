@@ -5,36 +5,28 @@
 SUBNET = 10.50.50
 SERVER_IP = 5.78.42.196
 SSH_REMOTE = h
+SESSION_NAME = ssh
 
 list:
-	python -m scripts.list_session
+	python -m scripts.list_session --session $(SESSION_NAME)
 
 ssh:
-	python -m scripts.ssh --public_ip $(SERVER_IP) --ssh_remote $(SSH_REMOTE) --prefix $(SUBNET)
+	python -m scripts.ssh --public_ip $(SERVER_IP) --ssh_remote $(SSH_REMOTE) --prefix $(SUBNET) --session $(SESSION_NAME)
 
 phone:
-	python -m scripts.add_phone --prefix $(SUBNET)
+	python -m scripts.add_device --name phone --prefix $(SUBNET) --qrcode --session $(SESSION_NAME)
 
 device:
-	python -m scripts.add_device --name kaz3080 --prefix $(SUBNET)
+	python -m scripts.add_device --name kaz3080 --prefix $(SUBNET) --session $(SESSION_NAME)
 
 send:
-	python -m scripts.config_send --file output/kaz3080.conf --port 9000 --code-length 6
+	python -m scripts.config_send --file output/kaz3080.conf --port 9000 --code-length 6 --session $(SESSION_NAME)
 
 load-and-upload:
-	python -m scripts.load_and_upload --prefix $(SUBNET)
+	python -m scripts.load_and_upload --prefix $(SUBNET) --session $(SESSION_NAME)
 
 inspect-beacon:
-	ssh $(SSH_REMOTE) "cat /etc/wireguard/beacon.conf"
-
-from-scratch:
-	python vpn_setup.py \
-		--subnet $(SUBNET) \
-		--public-ip $(SERVER_IP) \
-		--ssh-remote $(SSH_REMOTE) \
-		--server server \
-		--local bigmac \
-		--clients phone
+	ssh $(SSH_REMOTE) "cat /etc/wireguard/beacon.conf" --session $(SESSION_NAME)
 
 qr:
 	qrencode -t ANSIUTF8 -r output/phone.conf

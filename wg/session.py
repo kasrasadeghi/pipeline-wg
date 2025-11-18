@@ -1,6 +1,6 @@
 import json
 import os
-from typing import List
+from typing import List, Optional
 from wg.device import Device
 from wg.remote import remote
 from wg.text_config import make_server_config, make_client_config
@@ -31,14 +31,14 @@ class Session:
     return session
 
   def save(self):
-    with open(self.name + ".session", "w+") as f:
+    with open(f"sessions/{self.name}.session", "w+") as f:
       json.dump(self.to_dict(), f, indent=2)
     
   @staticmethod
   def load(name):
-    if not os.path.exists(name + ".session"):
+    if not os.path.exists(f"sessions/{name}.session"):
       return None
-    with open(name + ".session", "r") as f:
+    with open(f"sessions/{name}.session", "r") as f:
       data = json.load(f)
       return Session.from_dict(data)
   
@@ -59,7 +59,10 @@ class Network:
     self.prefix = prefix
     self.public_ip = public_ip
     self.devices: List[Device] = []
-    self.beacon: Device = None
+    self.beacon_name: Optional[str] = None
+
+  def beacon(self):
+    return next(device for device in self.devices if device.name == self.beacon_name)
 
   def next_device_number(self):
     device_numbers = [int(device.ip.rsplit(".", 1)[1]) for device in self.devices]
@@ -81,6 +84,13 @@ class Network:
     self.devices.append(device)
     self.parent_session.save()
     return device
+
+  # returns (created, device)
+  def get_or_create_device(self, name) -> (bool, Device):
+    for device in self.devices:
+      if device.name == name:
+        return False, device
+    return True, self.create_device(name)
   
   def remove_device(self, name):
     assert name in [dev.name for dev in self.devices], f"device with name '{name}' not found"
@@ -91,7 +101,7 @@ class Network:
   
   def create_beacon(self, name, ssh_remote):
     device = self.create_device(name)
-    self.beacon = device
+    self.beacon_name = device.name
     device.set_ssh_remote(ssh_remote)
     self.parent_session.save()
     return device
@@ -101,7 +111,7 @@ class Network:
       "prefix": self.prefix,
       "public_ip": self.public_ip,
       "devices": [device.to_dict() for device in self.devices],
-      "beacon_name": self.beacon.name if self.beacon else ''
+      "beacon_name": self.beacon_name if self.beacon_name else ''
     }
 
   @staticmethod
@@ -109,7 +119,7 @@ class Network:
     network = Network(session, data['prefix'], data['public_ip'])
     for device in data['devices']:
       network.devices.append(Device.from_dict(device))
-    network.beacon = next(device for device in network.devices if device.name == data['beacon_name'])
+    network.beacon_name = data['beacon_name']
     return network
 
   def beacon_config(self):
@@ -124,22 +134,22 @@ class Network:
     return make_client_config(device, server, self.public_ip)
 
   def upload_beacon_config(self):
-    remote('sudo systemctl stop wg-quick@*.service', self.beacon.ssh_remote, False)
-    remote('sudo rm /etc/wireguard/*.conf', self.beacon.ssh_remote, False)
+    remote('sudo systemctl stop wg-quick@*.service', self.beacon().ssh_remote, False)
+    remote('sudo rm /etc/wireguard/*.conf', self.beacon().ssh_remote, False)
     config = self.beacon_config()
-    path = f'/etc/wireguard/{self.beacon.name}.conf'
+    path = f'/etc/wireguard/{self.beacon_name}.conf'
 
     cmd = 'printf "' + config + '" | sudo tee "' + path + '" > /dev/null'
-    remote(cmd, self.beacon.ssh_remote, False)
-    remote('sudo systemctl restart wg-quick@' + self.beacon.name, self.beacon.ssh_remote, False)
+    remote(cmd, self.beacon().ssh_remote, False)
+    remote('sudo systemctl restart wg-quick@' + self.beacon_name, self.beacon().ssh_remote, False)
   
   def is_beacon_current(self):
-    path = f'/etc/wireguard/{self.beacon.name}.conf'
-    is_active = remote('sudo systemctl is-active --quiet wg-quick@' + self.beacon.name, self.beacon.ssh_remote, False).returncode == 0
+    path = f'/etc/wireguard/{self.beacon_name}.conf'
+    is_active = remote('sudo systemctl is-active --quiet wg-quick@' + self.beacon_name, self.beacon().ssh_remote, False).returncode == 0
     if not is_active:
       print("WARNING: beacon config is not active")
     
-    remote_conf = remote('cat "' + path + '"', self.beacon.ssh_remote, False).output
+    remote_conf = remote('cat "' + path + '"', self.beacon().ssh_remote, False).output
     config = self.beacon_config()
     if remote_conf != config:
       print("WARNING: beacon config is not current")
