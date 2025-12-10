@@ -6,9 +6,10 @@ argparser = argparse.ArgumentParser()
 argparser.add_argument("--name", type=str, default="client")
 argparser.add_argument("--prefix", type=str)
 argparser.add_argument("--qrcode", action="store_true")
+argparser.add_argument("--session", type=str, default="ssh")
 args = argparser.parse_args()
 
-session = Session.load("ssh")
+session = Session.load(args.session)
 if not session:
   print("ERROR: no session found, run ssh.py first")
   exit(1)

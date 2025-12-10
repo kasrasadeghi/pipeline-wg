@@ -123,7 +123,7 @@ class Network:
     return network
 
   def beacon_config(self):
-    server = self.beacon
+    server = self.beacon()
     clients = [device for device in self.devices if device.name != server.name]
     return make_server_config(server, clients)
   

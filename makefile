@@ -17,7 +17,7 @@ phone:
 	python -m scripts.add_device --name phone --prefix $(SUBNET) --qrcode --session $(SESSION_NAME)
 
 device:
-	python -m scripts.add_device --name kaz3080 --prefix $(SUBNET) --session $(SESSION_NAME)
+	python -m scripts.add_device --name kaz5090 --prefix $(SUBNET) --session $(SESSION_NAME)
 
 send:
 	python -m scripts.config_send --file output/kaz3080.conf --port 9000 --code-length 6 --session $(SESSION_NAME)
